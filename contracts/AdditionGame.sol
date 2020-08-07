@@ -28,10 +28,10 @@ contract AdditionGame {
         hosts[owner] = Host(name, id_number, phone);
     }
 
-    function getHost() public view returns (string name, string id_number, string phone) {
-        name = hosts[owner].name;
-        id_number = hosts[owner].id_number;
-        phone = hosts[owner].phone;
+    function getHost(address addr) public view returns (string name, string id_number, string phone) {
+        name = hosts[addr].name;
+        id_number = hosts[addr].id_number;
+        phone = hosts[addr].phone;
     }
 
     function getBalance() public view returns (uint) {

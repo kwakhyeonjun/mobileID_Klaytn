@@ -4,6 +4,7 @@ const config = {
   rpcURL: 'https://api.baobab.klaytn.net:8651'
 }
 const cav = new Caver(config.rpcURL); // instance
+const agContract = new cav.klay.Contract(DEPLOYED_ABI, DEPLOYED_ADDRESS); 
 
 const App = {
   auth: {
@@ -11,15 +12,25 @@ const App = {
     keystore: '',
     password: ''
   },
+
+  host:{
+    name: '',
+    id_num: '',
+    phone: ''
+  },
+
   // 세션 확인
   start: async function () {
     const walletFromSession = sessionStorage.getItem('walletInstance'); //키값을 불러서 상수로 저장
     if (walletFromSession) { // walletFromsession에 값이 있는지 확인
       try{
         cav.klay.accounts.wallet.add(JSON.parse(walletFromSession)); // cav-wallet에 해당 계정 정보를 다시 넣음
-        this.changeUI(JSON.parse(walletFromSession)); // login 되었으므로 UI 업데이트 (로그인된 화면)
+        this.changeUI_Login_notData(JSON.parse(walletFromSession)); // login 되었으므로 UI 업데이트 (로그인된 화면)
       } catch (e) { // 유효한 계정 정보가 아닌경우
         sessionStorage.removeItem('walletInstance'); // 정보 지움
+      }
+      if (this.checkValidHost(walletFromSession.address)) {
+        this.changeUI_Login_hasData(JSON.parse(walletFromSession));
       }
     }
   },
@@ -78,15 +89,25 @@ handleImport: async function () {
   },
 
   callOwner: async function () {
-
+    return await agContract.methods.owner().call();
   },
 
+  // 아마 안쓸듯
   callContractBalance: async function () {
-
+    return await agContract.methods.getBalance().call();
   },
 
   getWallet: function () {
 
+  },
+
+  checkValidHost: function (address) {
+    this.host = agContract.methods.getHost(address);
+    const isValidHost = this.host.name &&
+      this.host.id_num &&
+      this.host_phone;
+
+    return isValidHost;
   },
 
   checkValidKeystore: function (keystore) {
@@ -96,7 +117,7 @@ handleImport: async function () {
       parseKeystore.address &&
       parseKeystore.crypto;
 
-      return isValidKeystore;
+    return isValidKeystore;
   },
 
   // 계정정보 확인하는 function
@@ -104,8 +125,8 @@ handleImport: async function () {
     const walletInstance = cav.klay.accounts.privateKeyToAccount(privateKey);
     cav.klay.accounts.wallet.add(walletInstance); // caver instance를 통해 계정 정보를 쉽게 가져올 수 있음
     //웹브라우저 공간에 wallet 계속 저장 - 브라우저 꺼지기 전까지
-    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance)); //계정이 로그인된 상태를 유지하기 위해 사용 - 계정정보 유지
-    this.changeUI(walletInstance);
+    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance)); //계정이 로그인된 상태를 유지하기 위해 사용 - 계정정보 유지 - sessionStorage에 정보저장!!!!!!
+    this.changeUI_Login_notData(walletInstance);
   },
 
   reset: function () {
@@ -115,17 +136,14 @@ handleImport: async function () {
     };
   },
 
-
-  reset: function () {
-
-  },
-
-  //TODO
-  changeUI: async function (walletInstance) {
+  // TODO 1. 로그아웃UI 2. 로그인 - 정보없음UI 3. 로그인 - 정보있음UI
+  // 어떻게 구분함??
+  changeUI_Login_notData: async function (walletInstance) {
     $('#loginModal').modal('hide');
     $('#login').hide();
     $('#logout').show();
-    // $('#game').show();
+    $('#host_input').show();
+    $('#host_data').hide();
     $('#address').append('<br>' + '<p>' + '내 계정주소: ' + walletInstance.address + '</p>');
     // $('#contractBalance') // contract 잔액 불러오기
     // .append('<p>' + '이벤트 잔액: ' + cav.utils.fromPeb(await this.callContractBalance(), "KLAY") + 'KLAY'+ '<p>'); 
@@ -135,8 +153,29 @@ handleImport: async function () {
     }
   },
 
-  removeWallet: function () {
+  changeUI_Login_hasData: async function () {
+    $('#loginModal').modal('hide');
+    $('#login').hide();
+    $('#logout').show();
+    $('#host_input').hide();
+    $('#host_data').append('<br>' + '<p>' + '이름: ' + this.host.name + '</p>' + '<br>'
+                            + '<p>' + '주민등록번호: ' + this.host_id_num + '</p>' + '<br>'
+                            + '<p>' + '전화번호: ' + this.host_phone + '</p>' + '<br>')
+  },
 
+  inputHostData: function () {
+    var host_name = document.getElementById(host_name);
+    var host_id_num = document.getElementById(host_id_front) + "-" + document.getElementById(host_id_rear);
+    var host_phone = document.getElementById(host_phone);
+    agContract.methods.setHost(host_name, host_id_num, host_phone);
+    //sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance));
+    this.changeUI_Login_hasData();
+  },
+
+  removeWallet: function () {
+    cav.klay.accounts.wallet.clear();
+    sessionStorage.removeItem('walletInstance');
+    this.reset();
   },
 
   showTimer: function () {

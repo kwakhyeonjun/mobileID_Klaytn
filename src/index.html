@@ -40,6 +40,21 @@
     </div>
   </div>
 
+  <div class="container" id="host_input" style="display: none;">
+    <form id=host_data_input>
+      <p>이름: <input type="text" id="host_name"></p>
+      <p>주민등록번호: <input type="text" id="host_id_front" size="10" maxlength="6">
+        -<input type="password" id="host_id_rear" size="10" maxlength="7"></p>
+      <p>전화번호: <input type="tel" id="host_phone" size="20"></p>
+      <button type="button" class="btn btn-info pull-left" id="host_input_yes" onclick="App.inputHostData()">확인</button>
+    </form>
+  </div>
+
+  <div class="row text-center">
+    <div id="host_data"></div>
+  </div>
+  
+
   <div class="modal fade" tabindex="-1" role="dialog" id="loginModal">
     <div class="modal-dialog modal-sm">
       <div class="modal-content">
