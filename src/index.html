@@ -15,6 +15,7 @@
     integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 </head>
 
+<!--body start-->
 <body>
   <div class="container">
     <div class="row">
@@ -40,6 +41,7 @@
     </div>
   </div>
 
+  <!--회원가입 진행-->
   <div class="container" id="host_input" style="display: none;">
     <form id=host_data_input>
       <p>이름: <input type="text" id="host_name"></p>
@@ -47,13 +49,17 @@
         -<input type="password" id="host_id_rear" size="10" maxlength="7"></p>
       <p>전화번호: <input type="tel" id="host_phone" size="20"></p>
       <button type="button" class="btn btn-info pull-left" id="host_input_yes" onclick="App.inputHostData()">확인</button>
+      <!--inputHostData()로 Host data transaction !!!!ERROR-->
     </form>
   </div>
 
+  <!--회원가입 된 경우 Host Data 출력부-->
   <div class="row text-center">
     <div id="host_data"></div>
+    <button type="button" style="display: none;" class="btn btn-info pull-center" id="host_session_out" onclick="App.hostSessionOut()">임시 회원탈퇴 - 세션에서 없애기</button>
   </div>
-  
+
+  <div id="spin"></div>
 
   <div class="modal fade" tabindex="-1" role="dialog" id="loginModal">
     <div class="modal-dialog modal-sm">
@@ -76,8 +82,11 @@
       </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
   </div><!-- /.modal -->
-
+  
+    </div>
+  </div>
 </body>
+
 
 </html>
 
