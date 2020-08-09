@@ -1,21 +1,24 @@
 /**
  * TODO!
- *  - getHost(address)의 return이 3개인데 어떻게 처리함요 
- *  - 
- * 
+ *  - getHost(address)의 return이 3개인데 어떻게 처리함요 -- 해결했습니다.
+ *  - getHostFromContracts: async function (address) 해당 함수 수정해서 
+ *  - 줄21에 있는 임시변수 v1,v2,v3에 받아와 저장후 host에 복사하게 했습니다.
+ *  - (임시변수저장)-(값복사) scope 문제 떄문에 한 함수에 안 합쳐집니다. 일단 이대로 v1,v2,v3 써야할듯
+ *  - 이제 해야할일 : 로그인했을떄, 계정정보가 있는지 확인 후 가입창과 상태창으로 분기하는거 정리해야됨.
+ *  - 참고사항: 계정에 klay가 하나도 없으면 gas가 없어서 가입하는 트랜잭션을 못보냅니다. faucet필요
  * Note
  * - 현재 계정 정보 확인 : const walletInstance = getWallet();
  */
 
 import Caver from "caver-js";
-import {Spinner} from "Spin.js";
+import {Spinner} from "spin.js";
+
 
 const config = {
   rpcURL: 'https://api.baobab.klaytn.net:8651'
 }
 const cav = new Caver(config.rpcURL); // instance
 const agContract = new cav.klay.Contract(DEPLOYED_ABI, DEPLOYED_ADDRESS); 
-
 const App = {
   auth: {
     accessType: 'keystore',
@@ -30,7 +33,7 @@ const App = {
     id_num: '',
     phone: ''
   },
-
+  
   // 세션 확인, 최초 실행부
   start: async function () {
     const walletFromSession = sessionStorage.getItem('walletInstance'); //키값을 불러서 상수로 저장
@@ -40,37 +43,36 @@ const App = {
       try{
         // cav.klay.accounts.wallet이 현재 진행하는 계정 정보
         cav.klay.accounts.wallet.add(JSON.parse(walletFromSession)); // cav-wallet에 해당 계정 정보를 다시 넣음
-        this.changeUI_Login_notData(JSON.parse(walletFromSession)); // login 되었으므로 UI 업데이트 (로그인된 화면)
+        this.changeUI_Login_NoData(JSON.parse(walletFromSession)); // login 되었으므로 UI 업데이트 (로그인된 화면)
 
       } catch (e) { // 유효한 계정 정보가 아닌경우
         sessionStorage.removeItem('walletInstance'); // 정보 지움
       } 
-      const hostFromSession = sessionStorage.getItem('hostData');
 
-      console.log("host Session = " + JSON.parse(hostFromSession)); 
+
+      // Host Data 확인하기
+
+      const hostFromSession = sessionStorage.getItem('hostData');
     
       // JSON.parse(walletFromSession).address = 현재 계정 주소
       if(JSON.parse(hostFromSession)) { // 기능구현 - 세션에 host 저장한 경우
-        console.log("Session has Host Data")
+        console.log("Session has Host Data");
         try {
           this.host = JSON.parse(hostFromSession);
           this.changeUI_Login_hasData();
         } catch (e) {
           sessionStorage.removeItem('hostData');
         }
-      } else { // TODO
-        console.log("Session doesn't have data")
+      } else { // TODO : 세션에 정보 없는 경우
+        console.log("Session doesn't have data");
+        // 현재 계정으로 등록되어있는지 확인
         if(this.checkValidHost(JSON.parse(walletFromSession).address)){ // 현재 계정 주소로 가입되어있는지 확인
-          console.log("this user has host data")
-          // 회원탈퇴하는 버튼 필요
+          console.log("this user has host data");
           // 계정 정보 불러오기
 
-          // TODO!!!!!! 배열로 바꿔야하나
-          this.host = this.getHostFromContracts(JSON.parse(walletFromSession).address);
-
-          this.changeUI_Login_hasData();
-        } else { // 임시 else
-          console.log("this user doesn't have data")
+          // TODO 올바른 계정정보 contract에서 가져오기
+          // this.getHostFromContracts(JSON.parse(walletFromSession).address);
+          //getHost로 받아온 정보를 임시변수 v1,v2,v3에 저장
         }
       }
     }
@@ -141,17 +143,50 @@ handleImport: async function () {
     }
   },
 
-  // 비용절감 필요
-  getHostFromContracts: async function (address) {
-    return await agContract.methods.getHost(address).call();
+  hostSetter: function(n,i,p){ //받아온 host 정보를 임시변수 v1,v2,v3에 저장
+    v1 = n;
+    v2 = i;
+    v3 = p;
+  },
+  hostsetting: function(){ //임시변수를 통해 host 정보를 변경
+    this.host = {
+      name: v1,
+      id_num: v2,
+      phone: v3
+    } //(scope 문제때문에 위 함수랑 분리)
   },
 
+ 
+
+  // 비용절감 필요
+  getHostFromContracts: async function (address) {
+    agContract.methods.getHost(address)
+    .call().then( function (contract_host) {
+      $('#loginModal').modal('hide');
+      $('#login').hide();
+      $('#logout').show();
+      $('#host_input').remove();
+    
+      $('#host_data').show();
+      $('#host_session_out').show();
+      $('#host_data').append('<br>' + '<p>' + '이름: ' + contract_host.name + '</p>' + '<br>'
+                            + '<p>' + '주민등록번호: ' + contract_host.id_number + '</p>' + '<br>'
+                            + '<p>' + '전화번호: ' + contract_host.phone + '</p>' + '<br>');
+    });
+  },
+
+  // transaction에 무조건 data가 남음 = 취소한 데이터라는걸 표현해야할듯
+  // 이거 필요 없는듯
   checkValidHost: async function (address) {
-    const tempHost = this.getHostFromContracts(address); // 현재 진행하는 계정의 정보가 block에 있는지 확인하기 위해 host정보 확인
+    this.getHostFromContracts(address); // 현재 진행하는 계정의 정보가 block에 있는지 확인하기 위해 host정보 확인
+    console.log(host);
     //TODO
-    const isHost = tempHost.name &&
-                  tempHost.id_num &&
-                  tempHost.phone;
+    
+    
+    const isHost = (this.host.name != undefined) &&
+                  (this.id_num != undefined)  &&
+                  (this.host.phone != undefined) ;
+    console.log(isHost);
     return isHost;
   },
 
@@ -199,7 +234,7 @@ handleImport: async function () {
    * 로그인 되었지만 Data는 없는 경우
    * @param {}} walletInstance 
    */
-  changeUI_Login_notData: async function (walletInstance) {
+  changeUI_Login_NoData: async function (walletInstance) {
     $('#loginModal').modal('hide');
     $('#login').hide();
     $('#logout').show();
@@ -244,10 +279,11 @@ handleImport: async function () {
     // 추가부분
     if(walletInstance) { // 계정 정보 존재하는지 확인
       if(this.host) {// 정확히 구현필요
-        agContract.methods.setHost(walletInstance.address, this.host.name, this.host.id_num, this.host.phone).send({
+        agContract.methods.setHost(this.host.name, this.host.id_num, this.host.phone).send({
           from: walletInstance.address,
-          gas: '250000' 
-        })
+          gas: '250000',   //send 함수 수정했음 
+          value: 0
+        }) 
         .once('transactionHash', (txHash) => { // transaction hash로 return 받는 경우
           console.log(`txHash: ${txHash}`);
         })
@@ -282,6 +318,9 @@ handleImport: async function () {
 
   },
 
+  /**
+   * 
+   */
   showSpinner: function () {
     var target = document.getElementById("spin");
     return new Spinner(opts).spin(target);
@@ -291,6 +330,8 @@ handleImport: async function () {
 
   }
 };
+
+
 
 window.App = App;
 
