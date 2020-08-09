@@ -2,6 +2,10 @@
  * ######## 수정내역 ######### - 로그 계속 남겨주세요
  * 08/09 - 곽현준
  * - host의 주민등록번호 영역 id_num -> id_number로 변경 (contract와 동기)
+ * - hostdata 저장하는 sessionStorage 제거
+ * - 코드 깔끔히 정리
+ * - start 정리
+ *
  *
  * ######## 주의사항 ########
  * - 올리기 전에 불필요한 console.log() 지워주세요.
@@ -71,6 +75,46 @@ const App = {
 // 확인 필요한 코드 - 확인 요청 한 후에 아래로 내릴 것
 
   /**
+   * << 컨트랙트 >>
+   * Host data를 폼에 맞게 입력하면, 해당 데이터를 contract로 블록에 저장
+   * 암호화 필요
+   * @returns {Promise<void>}
+   */
+  inputHostData: async function () {
+    var spinner = this.showSpinner();
+
+    // html에서 입력받은 값 host에 저장함
+    this.host.name = document.getElementById("host_name").value;
+    this.host.id_number = document.getElementById("host_id_front").value + "-" + document.getElementById("host_id_rear").value;
+    this.host.phone = document.getElementById("host_phone").value;
+
+    const walletInstance = this.getWallet(); // 로그인된 계정 정보 확인
+    // 추가부분
+    if(walletInstance) { // 계정 정보 존재하는지 확인
+      if(this.host) {// 정확히 구현필요
+        agContract.methods.setHost(walletInstance.address, this.host.name, this.host.id_number, this.host.phone).send({
+          from: walletInstance.address,
+          gas: '250000',   //send 함수 수정했음
+          value: 0
+        })
+            .once('transactionHash', (txHash) => { // transaction hash로 return 받는 경우
+              console.log(`txHash: ${txHash}`);
+            })
+            .once('receipt', (receipt) => { // receipt(영수증)으로 return받는 경우
+              console.log(`(#${receipt.blockNumber})`, receipt); // 어느 블록에 추가되었는지 확인할 수 있음
+              spinner.stop(); // loading ui 종료
+              alert(JSON.stringify(this.host) + "로 컨트랙에 저장했습니다."); // 입력된 host 정보
+              location.reload();
+              // this.changeUI_Hostdata_has();  //TODO : 확인필요
+            })
+            .once('error', (error) => { // error가 발생한 경우
+              alert(error.message);
+            });
+      } return; // host 정보 없으면 종료
+    }
+  },
+
+  /**
    * << UI >>
    * hostdata 있는 경우
    * login창 없애고
@@ -86,7 +130,7 @@ const App = {
     $('#logout').show();
     $('#host_input').hide();
   
-    // $('#host_data').show();
+    $('#host_data').show();
     $('#host_session_out').show();
     $('#host_data').append('<br>' + '<p>' + '이름: ' + this.host.name + '</p>' + '<br>'
                           + '<p>' + '주민등록번호: ' + this.host.id_number + '</p>' + '<br>'
@@ -152,7 +196,7 @@ const App = {
     const walletInstance = this.getWallet(); // 로그인된 계정 정보 확인
     // 추가부분
     if(walletInstance) { // 계정 정보 존재하는지 확인
-      agContract.methods.setHost(this.host.name, this.host.id_number, this.host.phone).send({
+      agContract.methods.setHost(walletInstance.address, this.host.name, this.host.id_number, this.host.phone).send({
         from: walletInstance.address,
         gas: '250000',   //send 함수 수정했음
         value: 0
@@ -252,7 +296,7 @@ const App = {
    */
   getWallet: function () {
     if (cav.klay.accounts.wallet.length) { 
-      return cav.klay.accounts.wallet[0]; 
+      return cav.klay.accounts.wallet[0];
     }
   },
 
@@ -272,49 +316,11 @@ const App = {
     return isValidKeystore;
   },
 
-  /**
-   * << 컨트랙트 >>
-   * Host data를 폼에 맞게 입력하면, 해당 데이터를 contract로 블록에 저장
-   * 암호화 필요
-   * @returns {Promise<void>}
-   */
-  inputHostData: async function () {
-    var spinner = this.showSpinner();
 
-    // html에서 입력받은 값 host에 저장함
-    this.host.name = document.getElementById("host_name").value;
-    this.host.id_number = document.getElementById("host_id_front").value + "-" + document.getElementById("host_id_rear").value;
-    this.host.phone = document.getElementById("host_phone").value;
-
-    const walletInstance = this.getWallet(); // 로그인된 계정 정보 확인
-    // 추가부분
-    if(walletInstance) { // 계정 정보 존재하는지 확인
-      if(this.host) {// 정확히 구현필요
-        agContract.methods.setHost(this.host.name, this.host.id_number, this.host.phone).send({
-          from: walletInstance.address,
-          gas: '250000',   //send 함수 수정했음
-          value: 0
-        })
-        .once('transactionHash', (txHash) => { // transaction hash로 return 받는 경우
-          console.log(`txHash: ${txHash}`);
-        })
-        .once('receipt', (receipt) => { // receipt(영수증)으로 return받는 경우
-          console.log(`(#${receipt.blockNumber})`, receipt); // 어느 블록에 추가되었는지 확인할 수 있음
-          spinner.stop(); // loading ui 종료
-          alert(JSON.stringify(this.host) + "로 컨트랙에 저장했습니다."); // 입력된 host 정보
-          // location.reload();
-          this.changeUI_Hostdata_has();
-        })
-        .once('error', (error) => { // error가 발생한 경우
-          alert(error.message);
-        });
-      } return; // host 정보 없으면 종료
-    }
-  },
 
   /**
    * << 로그인 >>
-   * @param {*} privateKey 
+   * @param {*} priUvateKey
    * 계정 정보 세션에 저장
    * 세션이 꺼지기 전까지 정보 유지
    */

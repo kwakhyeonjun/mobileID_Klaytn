@@ -24,8 +24,8 @@ contract AdditionGame {
         owner = msg.sender;
     }
     
-    function setHost(string name, string id_number, string phone) external {
-        hosts[owner] = Host(name, id_number, phone);
+    function setHost(address addr, string name, string id_number, string phone) external {
+        hosts[addr] = Host(name, id_number, phone);
     }
 
     function getHost(address addr) public view returns (string name, string id_number, string phone) {
