@@ -1,13 +1,10 @@
 /**
- * TODO!
- *  - getHost(address)의 return이 3개인데 어떻게 처리함요 -- 해결했습니다.
- *  - getHostFromContracts: async function (address) 해당 함수 수정해서 
- *  - 줄21에 있는 임시변수 v1,v2,v3에 받아와 저장후 host에 복사하게 했습니다.
- *  - (임시변수저장)-(값복사) scope 문제 떄문에 한 함수에 안 합쳐집니다. 일단 이대로 v1,v2,v3 써야할듯
- *  - 이제 해야할일 : 로그인했을떄, 계정정보가 있는지 확인 후 가입창과 상태창으로 분기하는거 정리해야됨.
- *  - 참고사항: 계정에 klay가 하나도 없으면 gas가 없어서 가입하는 트랜잭션을 못보냅니다. faucet필요
- * Note
- * - 현재 계정 정보 확인 : const walletInstance = getWallet();
+ * ######## 수정내역 ######### - 로그 계속 남겨주세요
+ * 08/09 - 곽현준
+ * - host의 주민등록번호 영역 id_num -> id_number로 변경 (contract와 동기)
+ *
+ * ######## 주의사항 ########
+ * - 올리기 전에 불필요한 console.log() 지워주세요.
  */
 
 import Caver from "caver-js";
@@ -30,79 +27,195 @@ const App = {
 
   host:{
     name: '',
-    id_num: '',
+    id_number: '',
     phone: ''
   },
   
-  // 세션 확인, 최초 실행부
+  /**
+   * Start에서 변경할때 꼭 확인
+   */
   start: async function () {
-    const walletFromSession = sessionStorage.getItem('walletInstance'); //키값을 불러서 상수로 저장
+    const walletFromSession = sessionStorage.getItem('walletInstance'); // 사용자의 키값을 불러서 상수로 저장
 
-    if (walletFromSession) { // walletFromsession에 값이 있는지 확인
-      console.log("Session has wallet");
+    // 1. Session Loading - key Load
+    if (walletFromSession) {
       try{
         // cav.klay.accounts.wallet이 현재 진행하는 계정 정보
         cav.klay.accounts.wallet.add(JSON.parse(walletFromSession)); // cav-wallet에 해당 계정 정보를 다시 넣음
-        this.changeUI_Login_NoData(JSON.parse(walletFromSession)); // login 되었으므로 UI 업데이트 (로그인된 화면)
+        this.auth.address = JSON.parse(walletFromSession).address;
+
+        // 2. Session에 들어온 후 해당 계정의 Host Data 불러오기
+        const MyInfo = await this.checkValidHost(this.auth.address);
+
+        if(MyInfo){ // host정보가 입력되어 있는 경우
+          await this.changeUI_Hostdata_has();
+        } else { // host정보가 입력되어 있지 않은 경우
+          await this.changeUI_Hostdata_none();
+        }
 
       } catch (e) { // 유효한 계정 정보가 아닌경우
-        sessionStorage.removeItem('walletInstance'); // 정보 지움
+        sessionStorage.removeItem('walletInstance'); // session에서 정보 지움
       } 
+    } 
+  },
 
 
-      // Host Data 확인하기
 
-      const hostFromSession = sessionStorage.getItem('hostData');
+
+
+
+
+
+
+// ####### Functions - Can't control #######
+// 확인 필요한 코드 - 확인 요청 한 후에 아래로 내릴 것
+
+  /**
+   * << UI >>
+   * hostdata 있는 경우
+   * login창 없애고
+   * 로그인 버튼없애고 로그아웃 버튼으로
+   * 호스트 정보 입력창 없애고 호스트 정보 출력
+   * 호스트 정보 초기화 버튼 출력
+   * 
+   * 추후 필요 정보 업데이트 요망
+   */
+  changeUI_Hostdata_has: async function () {
+    $('#loginModal').modal('hide');
+    $('#login').hide();
+    $('#logout').show();
+    $('#host_input').hide();
+  
+    // $('#host_data').show();
+    $('#host_session_out').show();
+    $('#host_data').append('<br>' + '<p>' + '이름: ' + this.host.name + '</p>' + '<br>'
+                          + '<p>' + '주민등록번호: ' + this.host.id_number + '</p>' + '<br>'
+                          + '<p>' + '전화번호: ' + this.host.phone + '</p>' + '<br>');
+  },
+
+  /**
+   * << UI >>
+   * hostdata 없는 경우
+   * 로그인부분 없애고 로그아웃 버튼으로
+   * 호스트 정보 입력창 출력
+   */
+  changeUI_Hostdata_none: async function () {
+    $('#loginModal').modal('hide');
+    $('#login').hide();
+    $('#logout').show();
     
-      // JSON.parse(walletFromSession).address = 현재 계정 주소
-      if(JSON.parse(hostFromSession)) { // 기능구현 - 세션에 host 저장한 경우
-        console.log("Session has Host Data");
-        try {
-          this.host = JSON.parse(hostFromSession);
-          this.changeUI_Login_hasData();
-        } catch (e) {
-          sessionStorage.removeItem('hostData');
-        }
-      } else { // TODO : 세션에 정보 없는 경우
-        console.log("Session doesn't have data");
-        // 현재 계정으로 등록되어있는지 확인
-        if(this.checkValidHost(JSON.parse(walletFromSession).address)){ // 현재 계정 주소로 가입되어있는지 확인
-          console.log("this user has host data");
-          // 계정 정보 불러오기
+    $('#host_input').show();
+    $('#host_data').hide();
+    $('#host_session_out').hide();
+    $('#address').append('<br>' + '<p>' + '내 계정주소: ' + this.auth.address + '</p>');
+  },
 
-          // TODO 올바른 계정정보 contract에서 가져오기
-          // this.getHostFromContracts(JSON.parse(walletFromSession).address);
-          //getHost로 받아온 정보를 임시변수 v1,v2,v3에 저장
-        }
+  /**
+   *  << 컨트랙트 >>
+   *  컨트랙트에서 host정보 가져옴
+   * @param address : 현재 사용자 계정 주소
+   * @returns {Promise<*>}
+   */
+  getHostFromContracts: async function (address) {
+    return await agContract.methods.getHost(address).call();
+  },
+
+  /**
+   * << 컨트랙트 >> | << 로그인 >>
+   * 컨트랙에서 가져온 호스트 정보 this.host에 저장
+   * @param address 계정 주소
+   * @returns {Promise<boolean>}
+   */
+  checkValidHost: async function (address) {
+    const MyInfo = await this.getHostFromContracts(address);
+
+    this.host.name = MyInfo.name;
+    this.host.id_number = MyInfo.id_number;
+    this.host.phone = MyInfo.phone;
+
+    return this.host.name !== '' &&
+        this.host.id_number !== '' &&
+        this.host.phone !== '';
+  },
+
+  /**
+   * << 로그인 >> | << Host Data >>
+   * 회원탈퇴하는 경우
+   * host 정보를 모두 ''로 보내 계정 초기화
+   * @returns {Promise<void>}
+   */
+  hostSessionOut: async function () {
+    var spinner = this.showSpinner();
+
+    this.resetHost();
+
+    const walletInstance = this.getWallet(); // 로그인된 계정 정보 확인
+    // 추가부분
+    if(walletInstance) { // 계정 정보 존재하는지 확인
+      agContract.methods.setHost(this.host.name, this.host.id_number, this.host.phone).send({
+        from: walletInstance.address,
+        gas: '250000',   //send 함수 수정했음
+        value: 0
+      })
+          .once('transactionHash', (txHash) => { // transaction hash로 return 받는 경우
+            console.log(`txHash: ${txHash}`);
+          })
+          .once('receipt', (receipt) => { // receipt(영수증)으로 return받는 경우
+            console.log(`(#${receipt.blockNumber})`, receipt); // 어느 블록에 추가되었는지 확인할 수 있음
+            spinner.stop(); // loading ui 종료
+            alert(JSON.stringify(this.host) + "로 컨트랙에 저장했습니다."); // 입력된 host 정보
+            location.reload();
+          })
+          .once('error', (error) => { // error가 발생한 경우
+            alert(error.message);
+          });
+    }
+  },
+
+
+// ###### Functions - Can control ######
+//          정확히 작동되는 것만
+
+  // 
+  /**
+   * << 로그인 >>
+   * 유효한 키스토어 파일인지 확인
+   */
+  handleImport: async function () {
+    const fileReader = new FileReader();
+    fileReader.readAsText(event.target.files[0]); //file 선택
+    fileReader.onload = (event) => { // 선택 후 확인
+      try{
+        if (!this.checkValidKeystore(event.target.result)){ // 올바른 키스토어 파일인지 확인
+          $('#message').text('유효하지 않은 keystore 파일입니다.');
+          return;
+        } //검증통과
+        this.auth.keystore = event.target.result;
+        $('#message').text('keysore 통과. 비밀번호를 입력하세요.');
+        document.querySelector('#input-password').focus();
+      } catch (event) {
+        $('#message').text('유효하지 않은 keystore 파일입니다.');
+        return;
       }
     }
   },
 
-// 유효한 키스토어 파일인지 확인
-handleImport: async function () {
-  const fileReader = new FileReader();
-  fileReader.readAsText(event.target.files[0]); //file 선택
-  fileReader.onload = (event) => { // 선택 후 확인
-    try{
-      if (!this.checkValidKeystore(event.target.result)){ // 올바른 키스토어 파일인지 확인
-        $('#message').text('유효하지 않은 keystore 파일입니다.');
-        return;
-      } //검증통과
-      this.auth.keystore = event.target.result;
-      $('#message').text('keysore 통과. 비밀번호를 입력하세요.');
-      document.querySelector('#input-password').focus();.2
-      +362
-    } catch (event) {
-      $('#message').text('유효하지 않은 keystore 파일입니다.');
-      return;
-    }
-  }
-},
 
+  /**
+   * << 로그인 >> 
+   * 비밀번호 저장
+   * - 암호화 필요
+   * - 사용하는 부분 한번 더 확인 필요
+   */
   handlePassword: async function () {
     this.auth.password= event.target.value;
   },
 
+
+  /**
+   * << 로그인 >>
+   * 키스토어와 비밀번호 확인 후 로그인 진행
+   */
   handleLogin: async function () {
     if (this.auth.accessType === 'keystore') {
       try{ //caver instance 활용
@@ -115,85 +228,43 @@ handleImport: async function () {
     }
   },
 
+  /**
+   * << 로그인 >>
+   * 로그아웃 하는 경우 
+   */
   handleLogout: async function () {
     this.removeWallet(); //wallet clear, session clear
     location.reload(); // page restart
   },
 
-  generateNumbers: async function () {
-
-  },
-
-  deposit: async function () {
-
-  },
-
+  /**
+   * << 컨트랙트 >>
+   * 컨트랙트 보낸 사람인지 확인
+   */
   callOwner: async function () {
     return await agContract.methods.owner().call();
   },
 
-  // 아마 안쓸듯
-  callContractBalance: async function () {
-    return await agContract.methods.getBalance().call();
-  },
-
+  /**
+   * << 컨트랙트 >>
+   * cav.klay.accounts에 저장된 계정 중 첫번째 계정 불러옴
+   * 첫번째 계정 == 내가 로그인한 계정
+   */
   getWallet: function () {
-    if (cav.klay.accounts.wallet.length) { // cav.klay-wallet에 계정이 있다면
-      return cav.klay.accounts.wallet[0]; // 첫번째 계정 = 내가 로그인된 계정
+    if (cav.klay.accounts.wallet.length) { 
+      return cav.klay.accounts.wallet[0]; 
     }
   },
 
-  hostSetter: function(n,i,p){ //받아온 host 정보를 임시변수 v1,v2,v3에 저장
-    v1 = n;
-    v2 = i;
-    v3 = p;
-  },
-  hostsetting: function(){ //임시변수를 통해 host 정보를 변경
-    this.host = {
-      name: v1,
-      id_num: v2,
-      phone: v3
-    } //(scope 문제때문에 위 함수랑 분리)
-  },
-
- 
-
-  // 비용절감 필요
-  getHostFromContracts: async function (address) {
-    agContract.methods.getHost(address)
-    .call().then( function (contract_host) {
-      $('#loginModal').modal('hide');
-      $('#login').hide();
-      $('#logout').show();
-      $('#host_input').remove();
-    
-      $('#host_data').show();
-      $('#host_session_out').show();
-      $('#host_data').append('<br>' + '<p>' + '이름: ' + contract_host.name + '</p>' + '<br>'
-                            + '<p>' + '주민등록번호: ' + contract_host.id_number + '</p>' + '<br>'
-                            + '<p>' + '전화번호: ' + contract_host.phone + '</p>' + '<br>');
-    });
-  },
-
-  // transaction에 무조건 data가 남음 = 취소한 데이터라는걸 표현해야할듯
-  // 이거 필요 없는듯
-  checkValidHost: async function (address) {
-    this.getHostFromContracts(address); // 현재 진행하는 계정의 정보가 block에 있는지 확인하기 위해 host정보 확인
-    console.log(host);
-    //TODO
-    
-    
-    const isHost = (this.host.name != undefined) &&
-                  (this.id_num != undefined)  &&
-                  (this.host.phone != undefined) ;
-    console.log(isHost);
-    return isHost;
-  },
-
-  // 유효한 키스토어 파일인지 확인
+  /**
+   * << 컨트랙트 >> | << 로그인 >>
+   * @param {} keystore 
+   * 올바른 키스토어 파일인지 확인
+   * 키스토어 = {버전, id, 주소, crypto}이므로 모두 있는지 확인 후 return
+   */
   checkValidKeystore: function (keystore) {
-    const parseKeystore = JSON.parse(keystore); //키스토어파일을 JSON파일로 변경
-    const isValidKeystore = parseKeystore.version && // 키스토어파일이라면 version, id, address, crypto를 가지고 있음
+    const parseKeystore = JSON.parse(keystore); 
+    const isValidKeystore = parseKeystore.version && 
       parseKeystore.id &&
       parseKeystore.address &&
       parseKeystore.crypto;
@@ -201,89 +272,29 @@ handleImport: async function () {
     return isValidKeystore;
   },
 
-  // 계정정보 확인하는 function
-  integrateWallet: function (privateKey) {
-    const walletInstance = cav.klay.accounts.privateKeyToAccount(privateKey);
-    cav.klay.accounts.wallet.add(walletInstance); // caver instance를 통해 계정 정보를 쉽게 가져올 수 있음
-
-    //웹브라우저 공간에 wallet 계속 저장 - 브라우저 꺼지기 전까지
-    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance)); //계정이 로그인된 상태를 유지하기 위해 사용 - 계정정보 유지 - sessionStorage에 정보저장!!!!!!  
-    
-    // TODO : 다음 화면 확정지어야함;
-    location.reload();
-  },
-
-  reset: function () {
-    this.auth = {
-      kestore: '',
-      password: ''
-    };
-  },
-
-  resetHost: function (){
-    this.host = {
-      name: '',
-      id_num: '',
-      phone: ''
-    }
-  },
-
-  // 1. 로그아웃UI 2. 로그인 - 정보없음UI 3. 로그인 - 정보있음UI
-  
   /**
-   * 로그인 되었지만 Data는 없는 경우
-   * @param {}} walletInstance 
+   * << 컨트랙트 >>
+   * Host data를 폼에 맞게 입력하면, 해당 데이터를 contract로 블록에 저장
+   * 암호화 필요
+   * @returns {Promise<void>}
    */
-  changeUI_Login_NoData: async function (walletInstance) {
-    $('#loginModal').modal('hide');
-    $('#login').hide();
-    $('#logout').show();
-    
-    $('#host_input').show();
-    $('#host_data').hide();
-    $('#host_session_out').hide();
-    $('#address').append('<br>' + '<p>' + '내 계정주소: ' + walletInstance.address + '</p>');
-    
-    // if (await this.callOwner() === walletInstance.address) { // 로그인된 계정이 owner인 경우에만
-    //   $('#owner').show(); // owner부분을 보여주도록 설정
-    // }
-  },
-
-  /**
-   * Success - 로그인 데이터가 있는 경우 화면 출력
-   */
-  changeUI_Login_hasData: async function () {
-    
-    $('#loginModal').modal('hide');
-    $('#login').hide();
-    $('#logout').show();
-    $('#host_input').remove();
-  
-    $('#host_data').show();
-    $('#host_session_out').show();
-    $('#host_data').append('<br>' + '<p>' + '이름: ' + this.host.name + '</p>' + '<br>'
-                          + '<p>' + '주민등록번호: ' + this.host.id_num + '</p>' + '<br>'
-                          + '<p>' + '전화번호: ' + this.host.phone + '</p>' + '<br>');
-  },
-
-  // 형식에 맞춰 입력하면 컨트랙트로 블록에 올리는 부분!!
   inputHostData: async function () {
     var spinner = this.showSpinner();
-    
+
     // html에서 입력받은 값 host에 저장함
     this.host.name = document.getElementById("host_name").value;
-    this.host.id_num = document.getElementById("host_id_front").value + "-" + document.getElementById("host_id_rear").value;
+    this.host.id_number = document.getElementById("host_id_front").value + "-" + document.getElementById("host_id_rear").value;
     this.host.phone = document.getElementById("host_phone").value;
 
     const walletInstance = this.getWallet(); // 로그인된 계정 정보 확인
     // 추가부분
     if(walletInstance) { // 계정 정보 존재하는지 확인
       if(this.host) {// 정확히 구현필요
-        agContract.methods.setHost(this.host.name, this.host.id_num, this.host.phone).send({
+        agContract.methods.setHost(this.host.name, this.host.id_number, this.host.phone).send({
           from: walletInstance.address,
-          gas: '250000',   //send 함수 수정했음 
+          gas: '250000',   //send 함수 수정했음
           value: 0
-        }) 
+        })
         .once('transactionHash', (txHash) => { // transaction hash로 return 받는 경우
           console.log(`txHash: ${txHash}`);
         })
@@ -292,8 +303,7 @@ handleImport: async function () {
           spinner.stop(); // loading ui 종료
           alert(JSON.stringify(this.host) + "로 컨트랙에 저장했습니다."); // 입력된 host 정보
           // location.reload();
-          sessionStorage.setItem('hostData', JSON.stringify(this.host));
-          this.changeUI_Login_hasData();
+          this.changeUI_Hostdata_has();
         })
         .once('error', (error) => { // error가 발생한 경우
           alert(error.message);
@@ -302,36 +312,65 @@ handleImport: async function () {
     }
   },
 
-  hostSessionOut: function () {
-    sessionStorage.removeItem('hostData');
-    this.resetHost();
+  /**
+   * << 로그인 >>
+   * @param {*} privateKey 
+   * 계정 정보 세션에 저장
+   * 세션이 꺼지기 전까지 정보 유지
+   */
+  integrateWallet: function (privateKey) {
+    const walletInstance = cav.klay.accounts.privateKeyToAccount(privateKey);
+    cav.klay.accounts.wallet.add(walletInstance); // caver instance를 통해 계정 정보를 쉽게 가져올 수 있음
+
+    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance)); 
+    
     location.reload();
   },
 
+  /**
+   * << 로그인 >>
+   * Keystore를 통한 계정 로그아웃
+   */
+  reset: function () {
+    this.auth = {
+      kestore: '',
+      password: ''
+    };
+  },
+
+  /**
+   * << 로그인 >>
+   * HostData reset
+   * 회원탈퇴하는 경우 host data를 모두 undefined로 저장
+   */
+  resetHost: function (){
+    this.host = {
+      name: '',
+      id_number: '',
+      phone: ''
+    }
+  },
+
+  /**
+   * << 로그인 >>
+   * 계정 로그아웃
+   * 세션과 cav.clay.accounts에서 지움
+   */
   removeWallet: function () {
     cav.klay.accounts.wallet.clear();
     sessionStorage.removeItem('walletInstance');
     this.reset();
   },
 
-  showTimer: function () {
-
-  },
-
   /**
-   * 
+   * << UI >>
+   * 로딩 화면 구현
    */
   showSpinner: function () {
     var target = document.getElementById("spin");
     return new Spinner(opts).spin(target);
   },
-
-  receiveKlay: function () {
-
-  }
 };
-
-
 
 window.App = App;
 
